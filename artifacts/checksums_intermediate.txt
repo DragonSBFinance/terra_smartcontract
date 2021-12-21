@@ -1,0 +1,7 @@
+a5dbd7cc875deea90fef3d2604ab0bf9747f9c4e51d788744adfe9353381461c  ./target/wasm32-unknown-unknown/release/dragonsb.wasm
+ee0873fe58fb479f11610c50e063d809fdde8a1380d6c45a79f0b0837a000e8d  ./target/wasm32-unknown-unknown/release/my_first_contract.wasm
+56108c24f8861a5270fdb7bb5de6b6546c2f636bf4ec888ac2153744fb5d0872  ./target/wasm32-unknown-unknown/release/my_first_contract1.wasm
+7e9a2f0e2e4ba7f57300c79d7e0ada1013c7eebbc54f09e2c5ab338d826cf00e  ./target/wasm32-unknown-unknown/release/my_first_contract2.wasm
+431d88c2b731a2bab45507f3925f2528a6a89ab87b5ce59b7c7e00b7b04c9184  ./target/wasm32-unknown-unknown/release/my_first_contract3.wasm
+af0e54524c085e34580f0d59508c2e786dd9be04ed18d501c1864d0ca241915a  ./target/wasm32-unknown-unknown/release/my_first_contract4.wasm
+2903dc0402e81e839b0e43b31428331f287e4eb02fa23be8a5874c485cdd6d82  ./target/wasm32-unknown-unknown/release/unirealchain.wasm
