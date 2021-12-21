@@ -280,7 +280,7 @@ mod tests {
     // this will set up the instantiation for other tests
     fn _do_instantiate(
         mut deps: DepsMut,
-        addr: &str,
+        info: &MessageInfo,
         amount: Uint128,
     ) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
@@ -289,7 +289,7 @@ mod tests {
             decimals: 18,
             initial_balances: amount,
         };
-        let info = mock_info("creator", &[]);
+        
         let env = mock_env();
         let res = instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
@@ -304,7 +304,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), addr), amount);
+        assert_eq!(get_balance(deps.as_ref(), info.sender.to_string()), amount);
         meta
     }
 
@@ -318,7 +318,9 @@ mod tests {
             decimals: 18,
             initial_balances: amount,
         };
-        let info = mock_info("creator", &[]);
+        let addr1 = String::from("creator");
+        let info = mock_info(addr1.as_ref(), &[]);
+        
         let env = mock_env();
         let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
@@ -333,8 +335,8 @@ mod tests {
             }
         );
         assert_eq!(
-            get_balance(deps.as_ref(), "addr0000"),
-            Uint128::from(11223344u128)
+            get_balance(deps.as_ref(), addr1),
+            Uint128::from(11223344000000000000000000u128)
         );
     }
 
@@ -342,15 +344,17 @@ mod tests {
     fn queries_work() {
         let mut deps = mock_dependencies(&coins(2, "token"));
         let addr1 = String::from("addr0001");
+        let _info = mock_info(addr1.as_ref(), &[]);
+        
         let amount1 = Uint128::from(12340000000000000000000u128);
 
-        let expected = do_instantiate(deps.as_mut(), &addr1, amount1);
+        let expected = do_instantiate(deps.as_mut(), &info, amount1);
 
         // check meta query
         let loaded = query_token_info(deps.as_ref()).unwrap();
         assert_eq!(expected, loaded);
 
-        let _info = mock_info("test", &[]);
+        
         let env = mock_env();
         // check balance query (full)
         let data = query(
@@ -379,15 +383,16 @@ mod tests {
     fn transfer() {
         let mut deps = mock_dependencies(&coins(2, "token"));
         let addr1 = String::from("addr0001");
+        let info = mock_info(addr1.as_ref(), &[]);
         let addr2 = String::from("addr0002");
         let amount1 = Uint128::from(12340000000000000000000u128);
         let transfer = Uint128::from(76543000000000000000u128);
         let too_much = Uint128::from(12340321000000000000000u128);
 
-        do_instantiate(deps.as_mut(), &addr1, amount1);
+        do_instantiate(deps.as_mut(), &info, amount1);
 
         // cannot transfer nothing
-        let info = mock_info(addr1.as_ref(), &[]);
+       
         let env = mock_env();
         let msg = ExecuteMsg::Transfer {
             recipient: addr2.clone(),
@@ -439,11 +444,12 @@ mod tests {
     fn burn() {
         let mut deps = mock_dependencies(&coins(2, "token"));
         let addr1 = String::from("addr0001");
+        let info = mock_info(addr1.as_ref(), &[]);
         let amount1 = Uint128::from(12340000000000000000000u128);
         let burn = Uint128::from(76543000000000000000u128);
         let too_much = Uint128::from(12340321000000000000000u128);
 
-        do_instantiate(deps.as_mut(), &addr1, amount1);
+        do_instantiate(deps.as_mut(), &info, amount1);
 
         // cannot burn nothing
         let info = mock_info(addr1.as_ref(), &[]);
@@ -488,13 +494,14 @@ mod tests {
     fn send() {
         let mut deps = mock_dependencies(&coins(2, "token"));
         let addr1 = String::from("addr0001");
+        let info = mock_info(addr1.as_ref(), &[]);
         let contract = String::from("addr0002");
         let amount1 = Uint128::from(12340000000000000000000u128);
         let transfer = Uint128::from(76543000000000000000u128);
         let too_much = Uint128::from(12340321000000000000000u128);
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
-        do_instantiate(deps.as_mut(), &addr1, amount1);
+        do_instantiate(deps.as_mut(), &info, amount1);
 
         // cannot send nothing
         let info = mock_info(addr1.as_ref(), &[]);
