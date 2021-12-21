@@ -308,9 +308,9 @@ mod tests {
     }
 
     // this will set up the instantiation for other tests
-    fn do_instantiate<T: Into<String>>(
+    fn do_instantiate(
         mut deps: DepsMut,
-        addr: T,
+        info: &MessageInfo,
         amount: Uint128,
     ) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
@@ -319,7 +319,7 @@ mod tests {
             decimals: 18,
             initial_balances: amount,
         };
-        let info = mock_info("creator", &[]);
+        
         let env = mock_env();
         instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
@@ -333,7 +333,7 @@ mod tests {
         let spender = String::from("addr0002");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), owner.clone(), Uint128::from(12340000000000000000000u128));
+        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
 
         // no allowance to start
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
@@ -416,7 +416,8 @@ mod tests {
         let spender2 = String::from("addr0003");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000000000000000000u128));
+        let info = mock_info(owner.as_ref(), &[]);
+        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
 
         // no allowance to start
         assert_eq!(
@@ -509,7 +510,7 @@ mod tests {
         let owner = String::from("addr0001");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000000000000000000u128));
+        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
 
         // self-allowance
         let msg = ExecuteMsg::IncreaseAllowance {
@@ -536,9 +537,9 @@ mod tests {
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
         let rcpt = String::from("addr0003");
-
+        let info = mock_info(owner.as_ref(), &[]);
         let start = Uint128::from(999999000000000000000u128);
-        do_instantiate(deps.as_mut(), &owner, start);
+        do_instantiate(deps.as_mut(), &info, start);
 
         // provide an allowance
         let allow1 = Uint128::from(77777000000000000000u128);
@@ -616,9 +617,9 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
-
+        let info = mock_info(owner.as_ref(), &[]);
         let start = Uint128::from(999999000000000000000u128);
-        do_instantiate(deps.as_mut(), &owner, start);
+        do_instantiate(deps.as_mut(), &info, start);
 
         // provide an allowance
         let allow1 = Uint128::from(77777000000000000000u128);
@@ -694,9 +695,9 @@ mod tests {
         let spender = String::from("addr0002");
         let contract = String::from("cool-dex");
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
-
+        let info = mock_info(owner.as_ref(), &[]);
         let start = Uint128::from(999999000000000000000u128);
-        do_instantiate(deps.as_mut(), &owner, start);
+        do_instantiate(deps.as_mut(), &info, start);
 
         // provide an allowance
         let allow1 = Uint128::from(77777000000000000000u128);
