@@ -291,7 +291,6 @@ pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<
     Ok(allowance)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,18 +307,22 @@ mod tests {
     }
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(
+    fn do_instantiate<T: Into<String>>(
         mut deps: DepsMut,
-        info: &MessageInfo,
+        addr: T,
         amount: Uint128,
     ) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
-            name: "DragonSb".to_string(),
-            symbol: "SB".to_string(),
-            decimals: 18,
-            initial_balances: amount,
+            name: "Auto Gen".to_string(),
+            symbol: "AUTO".to_string(),
+            decimals: 3,
+            initial_balances: vec![Cw20Coin {
+                address: addr.into(),
+                amount,
+            }],
+            mint: None,
         };
-        
+        let info = mock_info("creator", &[]);
         let env = mock_env();
         instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
@@ -333,14 +336,14 @@ mod tests {
         let spender = String::from("addr0002");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
+        do_instantiate(deps.as_mut(), owner.clone(), Uint128::from(12340000u128));
 
         // no allowance to start
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
         assert_eq!(allowance, AllowanceResponse::default());
 
         // set allowance with height expiration
-        let allow1 = Uint128::from(7777000000000000000u128);
+        let allow1 = Uint128::from(7777u128);
         let expires = Expiration::AtHeight(5432);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
@@ -360,7 +363,7 @@ mod tests {
         );
 
         // decrease it a bit with no expire set - stays the same
-        let lower = Uint128::from(4444000000000000000u128);
+        let lower = Uint128::from(4444u128);
         let allow2 = allow1.checked_sub(lower).unwrap();
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
@@ -378,7 +381,7 @@ mod tests {
         );
 
         // increase it some more and override the expires
-        let raise = Uint128::from(87654000000000000000u128);
+        let raise = Uint128::from(87654u128);
         let allow3 = allow2 + raise;
         let new_expire = Expiration::AtTime(Timestamp::from_seconds(8888888888));
         let msg = ExecuteMsg::IncreaseAllowance {
@@ -399,7 +402,7 @@ mod tests {
         // decrease it below 0
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(99988647623876347000000000000000u128),
+            amount: Uint128::from(99988647623876347u128),
             expires: None,
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -416,8 +419,7 @@ mod tests {
         let spender2 = String::from("addr0003");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        let info = mock_info(owner.as_ref(), &[]);
-        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
+        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000u128));
 
         // no allowance to start
         assert_eq!(
@@ -444,7 +446,7 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // set other allowance with no expiration
-        let allow2 = Uint128::from(87654000000000000000u128);
+        let allow2 = Uint128::from(87654u128);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow2,
@@ -477,7 +479,7 @@ mod tests {
         // also allow spender -> spender2 with no interference
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
-        let allow3 = Uint128::from(1821000000000000000u128);
+        let allow3 = Uint128::from(1821u128);
         let expires3 = Expiration::AtTime(Timestamp::from_seconds(3767626296));
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
@@ -510,12 +512,12 @@ mod tests {
         let owner = String::from("addr0001");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
+        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000u128));
 
         // self-allowance
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: owner.clone(),
-            amount: Uint128::from(7777000000000000000u128),
+            amount: Uint128::from(7777u128),
             expires: None,
         };
         let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
@@ -524,7 +526,7 @@ mod tests {
         // decrease self-allowance
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: owner,
-            amount: Uint128::from(7777000000000000000u128),
+            amount: Uint128::from(7777u128),
             expires: None,
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
@@ -537,12 +539,12 @@ mod tests {
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
         let rcpt = String::from("addr0003");
-        let info = mock_info(owner.as_ref(), &[]);
-        let start = Uint128::from(999999000000000000000u128);
-        do_instantiate(deps.as_mut(), &info, start);
+
+        let start = Uint128::from(999999u128);
+        do_instantiate(deps.as_mut(), &owner, start);
 
         // provide an allowance
-        let allow1 = Uint128::from(77777000000000000000u128);
+        let allow1 = Uint128::from(77777u128);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -553,7 +555,7 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // valid transfer of part of the allowance
-        let transfer = Uint128::from(44444000000000000000u128);
+        let transfer = Uint128::from(44444u128);
         let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
@@ -583,7 +585,7 @@ mod tests {
         let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
-            amount: Uint128::from(33443000000000000000u128),
+            amount: Uint128::from(33443u128),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -595,7 +597,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(1000000000000000000u128),
+            amount: Uint128::from(1000u128),
             expires: Some(Expiration::AtHeight(env.block.height)),
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -604,7 +606,7 @@ mod tests {
         let msg = ExecuteMsg::TransferFrom {
             owner,
             recipient: rcpt,
-            amount: Uint128::from(33443000000000000000u128),
+            amount: Uint128::from(33443u128),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -617,12 +619,12 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
-        let info = mock_info(owner.as_ref(), &[]);
-        let start = Uint128::from(999999000000000000000u128);
-        do_instantiate(deps.as_mut(), &info, start);
+
+        let start = Uint128::from(999999u128);
+        do_instantiate(deps.as_mut(), &owner, start);
 
         // provide an allowance
-        let allow1 = Uint128::from(77777000000000000000u128);
+        let allow1 = Uint128::from(77777u128);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -633,7 +635,7 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // valid burn of part of the allowance
-        let transfer = Uint128::from(44444000000000000000u128);
+        let transfer = Uint128::from(44444u128);
         let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
             amount: transfer,
@@ -660,7 +662,7 @@ mod tests {
         // cannot burn more than the allowance
         let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
-            amount: Uint128::from(33443000000000000000u128),
+            amount: Uint128::from(33443u128),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -672,7 +674,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(1000000000000000000u128),
+            amount: Uint128::from(1000u128),
             expires: Some(Expiration::AtHeight(env.block.height)),
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -680,7 +682,7 @@ mod tests {
         // we should now get the expiration error
         let msg = ExecuteMsg::BurnFrom {
             owner,
-            amount: Uint128::from(33443000000000000000u128),
+            amount: Uint128::from(33443u128),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -695,12 +697,12 @@ mod tests {
         let spender = String::from("addr0002");
         let contract = String::from("cool-dex");
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
-        let info = mock_info(owner.as_ref(), &[]);
-        let start = Uint128::from(999999000000000000000u128);
-        do_instantiate(deps.as_mut(), &info, start);
+
+        let start = Uint128::from(999999u128);
+        do_instantiate(deps.as_mut(), &owner, start);
 
         // provide an allowance
-        let allow1 = Uint128::from(77777000000000000000u128);
+        let allow1 = Uint128::from(77777u128);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -711,7 +713,7 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // valid send of part of the allowance
-        let transfer = Uint128::from(44444000000000000000u128);
+        let transfer = Uint128::from(44444u128);
         let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
             amount: transfer,
@@ -759,7 +761,7 @@ mod tests {
         // cannot send more than the allowance
         let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
-            amount: Uint128::from(33443000000000000000u128),
+            amount: Uint128::from(33443u128),
             contract: contract.clone(),
             msg: send_msg.clone(),
         };
@@ -773,7 +775,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(1000000000000000000u128),
+            amount: Uint128::from(1000u128),
             expires: Some(Expiration::AtHeight(env.block.height)),
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -781,7 +783,7 @@ mod tests {
         // we should now get the expiration error
         let msg = ExecuteMsg::SendFrom {
             owner,
-            amount: Uint128::from(33443000000000000000u128),
+            amount: Uint128::from(33443u128),
             contract,
             msg: send_msg,
         };
@@ -791,4 +793,3 @@ mod tests {
         assert_eq!(err, ContractError::Expired {});
     }
 }
-

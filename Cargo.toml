@@ -1,6 +1,6 @@
 [package]
-name = "dragonsb"
-version = "0.1.0"
+name = "dragonsb3"
+version = "0.1.2"
 authors = ["huannn <huannn@vakaxa.com>"]
 edition = "2018"
 

@@ -88,14 +88,18 @@ mod tests {
     use crate::msg::{ExecuteMsg, InstantiateMsg};
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, info: &MessageInfo, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
-            name: "DragonSB".to_string(),
-            symbol: "SB".to_string(),
-            decimals: 18,
-            initial_balances: amount,
+            name: "Auto Gen".to_string(),
+            symbol: "AUTO".to_string(),
+            decimals: 3,
+            initial_balances: vec![Cw20Coin {
+                address: addr.into(),
+                amount,
+            }],
+            mint: None,
         };
-        
+        let info = mock_info("creator", &[]);
         let env = mock_env();
         instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
@@ -125,8 +129,7 @@ mod tests {
 
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        
-        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
+        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000u128));
 
         // no allowance to start
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
@@ -216,11 +219,11 @@ mod tests {
             .unwrap()
             .to_string();
         let expected_order = [acct4.clone(), acct1.clone(), acct3.clone(), acct2.clone()];
-        let info = mock_info(acct1.as_ref(), &[]);
-        do_instantiate(deps.as_mut(), &info, Uint128::from(12340000000000000000000u128));
+
+        do_instantiate(deps.as_mut(), &acct1, Uint128::from(12340000u128));
 
         // put money everywhere (to create balances)
-        
+        let info = mock_info(acct1.as_ref(), &[]);
         let env = mock_env();
         execute(
             deps.as_mut(),
@@ -228,7 +231,7 @@ mod tests {
             info.clone(),
             ExecuteMsg::Transfer {
                 recipient: acct2,
-                amount: Uint128::from(222222000000000000000u128),
+                amount: Uint128::from(222222u128),
             },
         )
         .unwrap();
@@ -238,7 +241,7 @@ mod tests {
             info.clone(),
             ExecuteMsg::Transfer {
                 recipient: acct3,
-                amount: Uint128::from(333333000000000000000u128),
+                amount: Uint128::from(333333u128),
             },
         )
         .unwrap();
@@ -248,7 +251,7 @@ mod tests {
             info,
             ExecuteMsg::Transfer {
                 recipient: acct4,
-                amount: Uint128::from(444444000000000000000u128),
+                amount: Uint128::from(444444u128),
             },
         )
         .unwrap();
@@ -444,4 +447,3 @@ mod tests {
         );
     }
 }
-
