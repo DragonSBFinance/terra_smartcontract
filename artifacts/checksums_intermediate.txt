@@ -2,6 +2,8 @@
 055a4c77ad072963138de88a4afda992afb6fc8cc610c6d4819c0068936fc74c  ./target/wasm32-unknown-unknown/release/dragonsb1.wasm
 1d53987c7cab10bb6df5c1841851acc5b007a244a1bcbe41e4fb58da22962fa7  ./target/wasm32-unknown-unknown/release/dragonsb2.wasm
 c7d198a086edabe365f565a9a9824080c02de2d2352856c052286b113bbed493  ./target/wasm32-unknown-unknown/release/dragonsb3.wasm
+057a5ac8e33c265bc9089743ffde639242e5a780b74a9b2244adc956f0f7077e  ./target/wasm32-unknown-unknown/release/dragonsbv1.wasm
+fb25540cfeb05b8c22df7dff170df972f7da9844c0083ef47654fd90e735b551  ./target/wasm32-unknown-unknown/release/dragonsbv2.wasm
 ee0873fe58fb479f11610c50e063d809fdde8a1380d6c45a79f0b0837a000e8d  ./target/wasm32-unknown-unknown/release/my_first_contract.wasm
 56108c24f8861a5270fdb7bb5de6b6546c2f636bf4ec888ac2153744fb5d0872  ./target/wasm32-unknown-unknown/release/my_first_contract1.wasm
 7e9a2f0e2e4ba7f57300c79d7e0ada1013c7eebbc54f09e2c5ab338d826cf00e  ./target/wasm32-unknown-unknown/release/my_first_contract2.wasm

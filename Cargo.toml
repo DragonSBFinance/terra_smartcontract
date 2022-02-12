@@ -1,5 +1,5 @@
 [package]
-name = "dragonsb3"
+name = "dragonsbv2"
 version = "0.1.2"
 authors = ["huannn <huannn@vakaxa.com>"]
 edition = "2018"
@@ -40,16 +40,14 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
-cw0 = {version = "0.8.0" }
-cw2 = {version = "0.8.0" }
-cw20 = { version = "0.8.0"}
-cw20-base = { version = "0.8.0"}
-cosmwasm-std = { version = "0.16.2" }
-cosmwasm-storage = { version = "0.16.0" }
-cw-storage-plus = "0.8.0"
-schemars = "0.8.3"
-serde = { version = "1.0.127", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.26" }
+cw-utils = { path = "packages/utils", version = "0.12.0" }
+cw2 = { path = "packages/cw2", version = "0.12.0" }
+cw20 = { path = "packages/cw20", version = "0.12.0" }
+cw-storage-plus = { path = "packages/storage-plus", version = "0.12.0" }
+cosmwasm-std = { version = "1.0.0-beta3" }
+schemars = "0.8.1"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.23" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.16.0" }
+cosmwasm-std = { version = "1.0.0-beta3" }

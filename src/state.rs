@@ -1,10 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::{Item, Map};
 
-use cw20::AllowanceResponse;
+use cw20::{AllowanceResponse, Logo, MarketingInfoResponse};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -18,7 +18,7 @@ pub struct TokenInfo {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterData {
-    pub minter: CanonicalAddr,
+    pub minter: Addr,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
 }
@@ -29,45 +29,8 @@ impl TokenInfo {
     }
 }
 
-pub const TOKEN_INFO: Item<TokenInfo> = Item::new("\u{0}\ntoken_info");
-pub const BALANCES: Map<&[u8], Uint128> = Map::new("balance");
-pub const ALLOWANCES: Map<(&[u8], &[u8]), AllowanceResponse> = Map::new("allowance");
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    use cosmwasm_std::testing::mock_dependencies;
-    use cosmwasm_std::{StdResult, Storage};
-    use cosmwasm_storage::{singleton, singleton_read};
-
-    pub static TOKEN_INFO_KEY: &[u8] = b"token_info";
-
-    pub fn store_token_info(storage: &mut dyn Storage, token_info: &TokenInfo) -> StdResult<()> {
-        singleton(storage, TOKEN_INFO_KEY).save(token_info)
-    }
-    pub fn read_token_info(storage: &dyn Storage) -> StdResult<TokenInfo> {
-        singleton_read(storage, TOKEN_INFO_KEY).load()
-    }
-
-    #[test]
-    fn token_info_legacy_compatibility() {
-        let mut deps = mock_dependencies(&[]);
-        store_token_info(
-            &mut deps.storage,
-            &TokenInfo {
-                name: "test".to_string(),
-                symbol: "TEST".to_string(),
-                decimals: 6,
-                total_supply: Default::default(),
-                mint: None,
-            },
-        )
-        .unwrap();
-
-        assert_eq!(
-            TOKEN_INFO.load(&deps.storage).unwrap(),
-            read_token_info(&deps.storage).unwrap()
-        );
-    }
-}
+pub const TOKEN_INFO: Item<TokenInfo> = Item::new("token_info");
+pub const MARKETING_INFO: Item<MarketingInfoResponse> = Item::new("marketing_info");
+pub const LOGO: Item<Logo> = Item::new("logo");
+pub const BALANCES: Map<&Addr, Uint128> = Map::new("balance");
+pub const ALLOWANCES: Map<(&Addr, &Addr), AllowanceResponse> = Map::new("allowance");
