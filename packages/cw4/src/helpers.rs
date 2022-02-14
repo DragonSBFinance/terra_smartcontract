@@ -2,8 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, WasmMsg,
-    WasmQuery,
+    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdResult, WasmMsg, WasmQuery,
 };
 
 use crate::msg::Cw4ExecuteMsg;
@@ -44,7 +43,7 @@ impl Cw4Contract {
     }
 
     pub fn remove_hook<T: Into<String>>(&self, addr: T) -> StdResult<CosmosMsg> {
-        let msg = Cw4ExecuteMsg::RemoveHook { addr: addr.into() };
+        let msg = Cw4ExecuteMsg::AddHook { addr: addr.into() };
         self.encode_msg(msg)
     }
 
@@ -55,7 +54,7 @@ impl Cw4Contract {
         self.encode_msg(msg)
     }
 
-    fn encode_smart_query<Q: CustomQuery>(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Q>> {
+    fn encode_smart_query(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Empty>> {
         Ok(WasmQuery::Smart {
             contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
@@ -64,7 +63,7 @@ impl Cw4Contract {
     }
 
     /// Show the hooks
-    pub fn hooks<Q: CustomQuery>(&self, querier: &QuerierWrapper<Q>) -> StdResult<Vec<String>> {
+    pub fn hooks(&self, querier: &QuerierWrapper) -> StdResult<Vec<String>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Hooks {})?;
         let res: HooksResponse = querier.query(&query)?;
         Ok(res.hooks)
@@ -75,45 +74,21 @@ impl Cw4Contract {
         Item::new(TOTAL_KEY).query(querier, self.addr())
     }
 
-    /// Check if this address is a member and returns its weight
-    pub fn is_member(
-        &self,
-        querier: &QuerierWrapper,
-        member: &Addr,
-        height: Option<u64>,
-    ) -> StdResult<Option<u64>> {
-        match height {
-            Some(height) => self.member_at_height(querier, member.to_string(), height.into()),
-            None => Map::new(MEMBERS_KEY).query(querier, self.addr(), member),
-        }
-    }
-
-    /// Check if this address is a member, and if its weight is >= 1
-    /// Returns member's weight in positive case
-    pub fn is_voting_member(
-        &self,
-        querier: &QuerierWrapper,
-        member: &Addr,
-        height: impl Into<Option<u64>>,
-    ) -> StdResult<Option<u64>> {
-        if let Some(weight) = self.member_at_height(querier, member.to_string(), height.into())? {
-            if weight >= 1 {
-                return Ok(Some(weight));
-            }
-        }
-        Ok(None)
+    /// Check if this address is a member, and if so, with which weight
+    pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
+        Map::new(MEMBERS_KEY).query(querier, self.addr(), addr)
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
-    pub fn member_at_height(
+    pub fn member_at_height<T: Into<String>>(
         &self,
         querier: &QuerierWrapper,
-        member: impl Into<String>,
-        at_height: Option<u64>,
+        member: T,
+        height: u64,
     ) -> StdResult<Option<u64>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Member {
             addr: member.into(),
-            at_height,
+            at_height: Some(height),
         })?;
         let res: MemberResponse = querier.query(&query)?;
         Ok(res.weight)

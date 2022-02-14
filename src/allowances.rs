@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, Addr, Api, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Storage, Uint128,
+    attr, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
@@ -22,14 +22,7 @@ pub fn execute_increase_allowance(
 
     ALLOWANCES.update(
         deps.storage,
-        (
-            deps.api
-                .addr_canonicalize(&info.sender.to_string())?
-                .as_slice(),
-            deps.api
-                .addr_canonicalize(&spender_addr.to_string())?
-                .as_slice(),
-        ),
+        (&info.sender, &spender_addr),
         |allow| -> StdResult<_> {
             let mut val = allow.unwrap_or_default();
             if let Some(exp) = expires {
@@ -40,12 +33,13 @@ pub fn execute_increase_allowance(
         },
     )?;
 
-    Ok(Response::new().add_attributes(vec![
+    let res = Response::new().add_attributes(vec![
         attr("action", "increase_allowance"),
         attr("owner", info.sender),
         attr("spender", spender),
         attr("amount", amount),
-    ]))
+    ]);
+    Ok(res)
 }
 
 pub fn execute_decrease_allowance(
@@ -61,10 +55,7 @@ pub fn execute_decrease_allowance(
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let spender_raw = deps.api.addr_canonicalize(spender.as_str())?;
-
-    let key = (sender_raw.as_slice(), spender_raw.as_slice());
+    let key = (&info.sender, &spender_addr);
     // load value and delete if it hits 0, or update otherwise
     let mut allowance = ALLOWANCES.load(deps.storage, key)?;
     if amount < allowance.allowance {
@@ -81,47 +72,40 @@ pub fn execute_decrease_allowance(
         ALLOWANCES.remove(deps.storage, key);
     }
 
-    Ok(Response::new().add_attributes(vec![
+    let res = Response::new().add_attributes(vec![
         attr("action", "decrease_allowance"),
         attr("owner", info.sender),
         attr("spender", spender),
         attr("amount", amount),
-    ]))
+    ]);
+    Ok(res)
 }
 
 // this can be used to update a lower allowance - call bucket.update with proper keys
 pub fn deduct_allowance(
     storage: &mut dyn Storage,
-    api: &dyn Api,
     owner: &Addr,
     spender: &Addr,
     block: &BlockInfo,
     amount: Uint128,
 ) -> Result<AllowanceResponse, ContractError> {
-    ALLOWANCES.update(
-        storage,
-        (
-            api.addr_canonicalize(&owner.to_string())?.as_slice(),
-            api.addr_canonicalize(&spender.to_string())?.as_slice(),
-        ),
-        |current| {
-            match current {
-                Some(mut a) => {
-                    if a.expires.is_expired(block) {
-                        Err(ContractError::Expired {})
-                    } else {
-                        // deduct the allowance if enough
-                        a.allowance = a
-                            .allowance
-                            .checked_sub(amount)
-                            .map_err(StdError::overflow)?;
-                        Ok(a)
-                    }
+    ALLOWANCES.update(storage, (owner, spender), |current| {
+        match current {
+            Some(mut a) => {
+                if a.expires.is_expired(block) {
+                    Err(ContractError::Expired {})
+                } else {
+                    // deduct the allowance if enough
+                    a.allowance = a
+                        .allowance
+                        .checked_sub(amount)
+                        .map_err(StdError::overflow)?;
+                    Ok(a)
                 }
-                None => Err(ContractError::NoAllowance {}),
             }
-        },
-    )
+            None => Err(ContractError::NoAllowance {}),
+        }
+    })
 }
 
 pub fn execute_transfer_from(
@@ -136,39 +120,29 @@ pub fn execute_transfer_from(
     let owner_addr = deps.api.addr_validate(&owner)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(
-        deps.storage,
-        deps.api,
-        &owner_addr,
-        &info.sender,
-        &env.block,
-        amount,
-    )?;
+    deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     BALANCES.update(
         deps.storage,
-        deps.api
-            .addr_canonicalize(&owner_addr.to_string())?
-            .as_slice(),
+        &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        deps.api
-            .addr_canonicalize(&rcpt_addr.to_string())?
-            .as_slice(),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    Ok(Response::new().add_attributes(vec![
+    let res = Response::new().add_attributes(vec![
         attr("action", "transfer_from"),
         attr("from", owner),
         attr("to", recipient),
         attr("by", info.sender),
         attr("amount", amount),
-    ]))
+    ]);
+    Ok(res)
 }
 
 pub fn execute_burn_from(
@@ -182,21 +156,12 @@ pub fn execute_burn_from(
     let owner_addr = deps.api.addr_validate(&owner)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(
-        deps.storage,
-        deps.api,
-        &owner_addr,
-        &info.sender,
-        &env.block,
-        amount,
-    )?;
+    deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     // lower balance
     BALANCES.update(
         deps.storage,
-        deps.api
-            .addr_canonicalize(&owner_addr.to_string())?
-            .as_slice(),
+        &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -207,12 +172,13 @@ pub fn execute_burn_from(
         Ok(meta)
     })?;
 
-    Ok(Response::new().add_attributes(vec![
+    let res = Response::new().add_attributes(vec![
         attr("action", "burn_from"),
         attr("from", owner),
         attr("by", info.sender),
         attr("amount", amount),
-    ]))
+    ]);
+    Ok(res)
 }
 
 pub fn execute_send_from(
@@ -228,30 +194,19 @@ pub fn execute_send_from(
     let owner_addr = deps.api.addr_validate(&owner)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(
-        deps.storage,
-        deps.api,
-        &owner_addr,
-        &info.sender,
-        &env.block,
-        amount,
-    )?;
+    deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     // move the tokens to the contract
     BALANCES.update(
         deps.storage,
-        deps.api
-            .addr_canonicalize(&owner_addr.to_string())?
-            .as_slice(),
+        &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        deps.api
-            .addr_canonicalize(&rcpt_addr.to_string())?
-            .as_slice(),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -263,30 +218,23 @@ pub fn execute_send_from(
         attr("amount", amount),
     ];
 
-    Ok(Response::new().add_attributes(attrs).add_message(
-        // create a send message
-        Cw20ReceiveMsg {
-            sender: info.sender.into(),
-            amount,
-            msg,
-        }
-        .into_cosmos_msg(contract)?,
-    ))
+    // create a send message
+    let msg = Cw20ReceiveMsg {
+        sender: info.sender.into(),
+        amount,
+        msg,
+    }
+    .into_cosmos_msg(contract)?;
+
+    let res = Response::new().add_message(msg).add_attributes(attrs);
+    Ok(res)
 }
 
 pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<AllowanceResponse> {
     let owner_addr = deps.api.addr_validate(&owner)?;
     let spender_addr = deps.api.addr_validate(&spender)?;
     let allowance = ALLOWANCES
-        .may_load(
-            deps.storage,
-            (
-                deps.api.addr_canonicalize(owner_addr.as_str())?.as_slice(),
-                deps.api
-                    .addr_canonicalize(spender_addr.as_str())?
-                    .as_slice(),
-            ),
-        )?
+        .may_load(deps.storage, (&owner_addr, &spender_addr))?
         .unwrap_or_default();
     Ok(allowance)
 }
@@ -295,7 +243,7 @@ pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<
 mod tests {
     use super::*;
 
-    use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, CosmosMsg, SubMsg, Timestamp, WasmMsg};
     use cw20::{Cw20Coin, TokenInfoResponse};
 
@@ -321,6 +269,7 @@ mod tests {
                 amount,
             }],
             mint: None,
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -330,20 +279,20 @@ mod tests {
 
     #[test]
     fn increase_decrease_allowances() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let mut deps = mock_dependencies(&coins(2, "token"));
 
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), owner.clone(), Uint128::from(12340000u128));
+        do_instantiate(deps.as_mut(), owner.clone(), Uint128::new(12340000));
 
         // no allowance to start
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
         assert_eq!(allowance, AllowanceResponse::default());
 
         // set allowance with height expiration
-        let allow1 = Uint128::from(7777u128);
+        let allow1 = Uint128::new(7777);
         let expires = Expiration::AtHeight(5432);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
@@ -363,7 +312,7 @@ mod tests {
         );
 
         // decrease it a bit with no expire set - stays the same
-        let lower = Uint128::from(4444u128);
+        let lower = Uint128::new(4444);
         let allow2 = allow1.checked_sub(lower).unwrap();
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
@@ -381,7 +330,7 @@ mod tests {
         );
 
         // increase it some more and override the expires
-        let raise = Uint128::from(87654u128);
+        let raise = Uint128::new(87654);
         let allow3 = allow2 + raise;
         let new_expire = Expiration::AtTime(Timestamp::from_seconds(8888888888));
         let msg = ExecuteMsg::IncreaseAllowance {
@@ -402,7 +351,7 @@ mod tests {
         // decrease it below 0
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(99988647623876347u128),
+            amount: Uint128::new(99988647623876347),
             expires: None,
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -412,14 +361,14 @@ mod tests {
 
     #[test]
     fn allowances_independent() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let mut deps = mock_dependencies(&coins(2, "token"));
 
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
         let spender2 = String::from("addr0003");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000u128));
+        do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
 
         // no allowance to start
         assert_eq!(
@@ -436,7 +385,7 @@ mod tests {
         );
 
         // set allowance with height expiration
-        let allow1 = Uint128::from(7777u128);
+        let allow1 = Uint128::new(7777);
         let expires = Expiration::AtHeight(5432);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
@@ -446,7 +395,7 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // set other allowance with no expiration
-        let allow2 = Uint128::from(87654u128);
+        let allow2 = Uint128::new(87654);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow2,
@@ -479,7 +428,7 @@ mod tests {
         // also allow spender -> spender2 with no interference
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
-        let allow3 = Uint128::from(1821u128);
+        let allow3 = Uint128::new(1821);
         let expires3 = Expiration::AtTime(Timestamp::from_seconds(3767626296));
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
@@ -507,17 +456,17 @@ mod tests {
 
     #[test]
     fn no_self_allowance() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+        let mut deps = mock_dependencies(&coins(2, "token"));
 
         let owner = String::from("addr0001");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128::from(12340000u128));
+        do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
 
         // self-allowance
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: owner.clone(),
-            amount: Uint128::from(7777u128),
+            amount: Uint128::new(7777),
             expires: None,
         };
         let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
@@ -526,7 +475,7 @@ mod tests {
         // decrease self-allowance
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: owner,
-            amount: Uint128::from(7777u128),
+            amount: Uint128::new(7777),
             expires: None,
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
@@ -535,16 +484,16 @@ mod tests {
 
     #[test]
     fn transfer_from_respects_limits() {
-        let mut deps = mock_dependencies_with_balance(&[]);
+        let mut deps = mock_dependencies(&[]);
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
         let rcpt = String::from("addr0003");
 
-        let start = Uint128::from(999999u128);
+        let start = Uint128::new(999999);
         do_instantiate(deps.as_mut(), &owner, start);
 
         // provide an allowance
-        let allow1 = Uint128::from(77777u128);
+        let allow1 = Uint128::new(77777);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -555,7 +504,7 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // valid transfer of part of the allowance
-        let transfer = Uint128::from(44444u128);
+        let transfer = Uint128::new(44444);
         let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
@@ -585,7 +534,7 @@ mod tests {
         let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
-            amount: Uint128::from(33443u128),
+            amount: Uint128::new(33443),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -597,7 +546,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(1000u128),
+            amount: Uint128::new(1000),
             expires: Some(Expiration::AtHeight(env.block.height)),
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -606,7 +555,7 @@ mod tests {
         let msg = ExecuteMsg::TransferFrom {
             owner,
             recipient: rcpt,
-            amount: Uint128::from(33443u128),
+            amount: Uint128::new(33443),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -616,15 +565,15 @@ mod tests {
 
     #[test]
     fn burn_from_respects_limits() {
-        let mut deps = mock_dependencies_with_balance(&[]);
+        let mut deps = mock_dependencies(&[]);
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
 
-        let start = Uint128::from(999999u128);
+        let start = Uint128::new(999999);
         do_instantiate(deps.as_mut(), &owner, start);
 
         // provide an allowance
-        let allow1 = Uint128::from(77777u128);
+        let allow1 = Uint128::new(77777);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -635,7 +584,7 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // valid burn of part of the allowance
-        let transfer = Uint128::from(44444u128);
+        let transfer = Uint128::new(44444);
         let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
             amount: transfer,
@@ -662,7 +611,7 @@ mod tests {
         // cannot burn more than the allowance
         let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
-            amount: Uint128::from(33443u128),
+            amount: Uint128::new(33443),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -674,7 +623,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(1000u128),
+            amount: Uint128::new(1000),
             expires: Some(Expiration::AtHeight(env.block.height)),
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -682,7 +631,7 @@ mod tests {
         // we should now get the expiration error
         let msg = ExecuteMsg::BurnFrom {
             owner,
-            amount: Uint128::from(33443u128),
+            amount: Uint128::new(33443),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -692,17 +641,17 @@ mod tests {
 
     #[test]
     fn send_from_respects_limits() {
-        let mut deps = mock_dependencies_with_balance(&[]);
+        let mut deps = mock_dependencies(&[]);
         let owner = String::from("addr0001");
         let spender = String::from("addr0002");
         let contract = String::from("cool-dex");
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
-        let start = Uint128::from(999999u128);
+        let start = Uint128::new(999999);
         do_instantiate(deps.as_mut(), &owner, start);
 
         // provide an allowance
-        let allow1 = Uint128::from(77777u128);
+        let allow1 = Uint128::new(77777);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -713,7 +662,7 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // valid send of part of the allowance
-        let transfer = Uint128::from(44444u128);
+        let transfer = Uint128::new(44444);
         let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
             amount: transfer,
@@ -761,7 +710,7 @@ mod tests {
         // cannot send more than the allowance
         let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
-            amount: Uint128::from(33443u128),
+            amount: Uint128::new(33443),
             contract: contract.clone(),
             msg: send_msg.clone(),
         };
@@ -775,7 +724,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
-            amount: Uint128::from(1000u128),
+            amount: Uint128::new(1000),
             expires: Some(Expiration::AtHeight(env.block.height)),
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
@@ -783,7 +732,7 @@ mod tests {
         // we should now get the expiration error
         let msg = ExecuteMsg::SendFrom {
             owner,
-            amount: Uint128::from(33443u128),
+            amount: Uint128::new(33443),
             contract,
             msg: send_msg,
         };
